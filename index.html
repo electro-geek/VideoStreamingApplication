@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Stream</title>
+</head>
+<body>
+    <div>
+        <select id="videoSelect"></select>
+        <button onclick="selectVideo()">Play Video</button>
+    </div>
+    <video id="video" controls autoplay></video>
+    <script>
+        const videoSelect = document.getElementById('videoSelect');
+        const video = document.getElementById('video');
+        let ws;
+
+        async function fetchVideoList() {
+            try {
+                console.log("Fetching video list...");
+                const response = await fetch('http://localhost:8081/videos');
+                console.log("Response status:", response.status);
+                console.log("Response headers:", response.headers);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const text = await response.text();
+                console.log("Response text:", text);
+                
+                const videos = JSON.parse(text);
+                console.log("Parsed videos:", videos);
+                
+                videos.forEach(video => {
+                    const option = document.createElement('option');
+                    option.value = video;
+                    option.text = video;
+                    videoSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error fetching video list:', error);
+                const errorMsg = document.createElement('p');
+                errorMsg.textContent = 'Failed to load video list. Please try again later.';
+                document.body.appendChild(errorMsg);
+            }
+        }
+
+        async function selectVideo() {
+            const selectedVideo = videoSelect.value;
+            if (ws) {
+                ws.close();
+            }
+            ws = new WebSocket('ws://localhost:8765');
+            ws.binaryType = 'arraybuffer';
+            ws.onopen = () => {
+                console.log('WebSocket connected. Sending SELECT message...');
+                ws.send('SELECT ' + selectedVideo);
+            };
+            ws.onmessage = async function(event) {
+                const blob = new Blob([event.data], { type: 'video/mp4' });
+                const url = URL.createObjectURL(blob);
+                
+                // Load and play the video
+                video.src = url;
+                try {
+                    await video.play();
+                } catch (error) {
+                    console.error('Error playing video:', error);
+                }
+            };
+        }
+
+        fetchVideoList().catch(console.error);
+    </script>
+</body>
+</html>
