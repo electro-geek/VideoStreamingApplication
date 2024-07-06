@@ -25,12 +25,24 @@ async def video_stream(websocket, path):
             video_name = message.split(" ", 1)[1]
             video_path = os.path.join(VIDEO_DIR, video_name)
             if os.path.exists(video_path):
-                with open(video_path, "rb") as video_file:
-                    while True:
-                        chunk = video_file.read(1024*1024)  # Read 1MB at a time
-                        if not chunk:
-                            break
-                        await websocket.send(chunk)
+                cap = cv2.VideoCapture(video_path)
+                if not cap.isOpened():
+                    await websocket.send(f"Error: Could not open video '{video_name}'")
+                    continue
+
+                while True:
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+
+                    # Process frame (e.g., resize, convert to grayscale, etc.)
+                    # For demonstration, encoding the frame as base64
+                    _, buffer = cv2.imencode('.jpg', frame)
+                    frame_base64 = base64.b64encode(buffer).decode('utf-8')
+
+                    await websocket.send(frame_base64)
+
+                cap.release()
             else:
                 await websocket.send(f"Error: Video '{video_name}' not found")
 
@@ -65,7 +77,7 @@ async def run_servers():
     print(f"WebSocket server started at ws://localhost:8765")
     
     while True:
-        await asyncio.sleep(3600)  # Keep the server running
+        await asyncio.sleep(36000)  # Keep the server running
 
 if __name__ == "__main__":
     asyncio.run(run_servers())
